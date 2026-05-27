@@ -20,7 +20,7 @@ COPY app/ app/
 COPY database/ database/
 
 # Generate optimized autoloader
-RUN composer dump-autoload --no-dev --optimize
+RUN composer dump-autoload --no-dev --no-scripts --optimize
 
 # ---------------------------------------------------------
 
