@@ -28,8 +28,6 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Step 4: Build and Push Docker image
-      # The image will be tagged with 'latest' and the git commit SHA.
-      # It also uses GitHub Actions caching to speed up subsequent builds.
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v6
         with:
@@ -62,10 +60,14 @@ jobs:
             # Login ke Docker Hub (jika repo private)
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
+            # Matikan container dan HAPUS VOLUME 'gdrive-app' agar dibuat ulang dari image terbaru
+            # Ini memastikan file lama dan permission yang salah benar-benar bersih
+            docker compose -f docker-compose.prod.yml down -v
+
             # Pull image terbaru
             docker compose -f docker-compose.prod.yml pull
 
-            # Restart container dengan file konfigurasi produksi
+            # Jalankan container (volume baru otomatis terisi file dari image)
             docker compose -f docker-compose.prod.yml up -d
 
             # Maintenance task di dalam container (Gunakan user www-data)
