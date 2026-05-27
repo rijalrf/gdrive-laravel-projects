@@ -12,8 +12,15 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Copy only composer files first for better caching
 COPY composer.json composer.lock ./
 
-# Install dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+# Install dependencies without scripts and without autoloader (to cache vendor)
+RUN composer install --no-dev --no-scripts --no-autoloader --no-interaction --no-progress
+
+# Copy the rest of the application files needed for autoloading
+COPY app/ app/
+COPY database/ database/
+
+# Generate optimized autoloader
+RUN composer dump-autoload --no-dev --optimize
 
 # ---------------------------------------------------------
 
@@ -74,6 +81,8 @@ RUN mkdir -p storage/framework/{sessions,views,cache} bootstrap/cache \
     && chmod -R 775 /app/storage /app/bootstrap/cache
 
 # Generate cache
+# Note: We don't use USER www-data here because we need root to run these commands
+# and write to the mounted volumes if necessary, but the files are already chowned.
 RUN php artisan package:discover --ansi \
     && php artisan config:cache \
     && php artisan route:cache \
