@@ -37,8 +37,8 @@ jobs:
           file: Dockerfile.prod
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/gdrive-laravel:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/gdrive-laravel:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/gdrive-service:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/gdrive-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -57,7 +57,7 @@ jobs:
           port: ${{ secrets.SSH_PORT || '22' }}
           script: |
             # Pindah ke direktori proyek di server
-            cd /path/to/your/app
+            cd /home/deployer/gdrive-laravel-projects
 
             # Login ke Docker Hub (jika repo private)
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
