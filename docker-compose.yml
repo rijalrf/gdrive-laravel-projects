@@ -41,6 +41,26 @@ services:
     networks:
       - shared-network
 
+  gdrive-scheduler:
+    build:
+      context: .
+      dockerfile: .docker/php/Dockerfile
+    container_name: gdrive-scheduler
+    volumes:
+      - .:/app
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - QUEUE_CONNECTION=database
+      - DB_CONNECTION=pgsql
+      - DB_HOST=host.docker.internal
+      - DB_PORT=5432
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: php artisan schedule:work
+    networks:
+      - shared-network
+
 networks:
   shared-network:
     name: laravel-shared-network
