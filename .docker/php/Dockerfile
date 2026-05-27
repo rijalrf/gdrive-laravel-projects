@@ -30,6 +30,9 @@ RUN apk add --no-cache \
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install -j$(nproc) gd pdo pdo_sqlite pdo_pgsql mbstring zip exif pcntl
 
+# Copy custom php configuration
+COPY .docker/php/php.ini $PHP_INI_DIR/conf.d/custom-php.ini
+
 # Copy application files (excluding those in .dockerignore)
 COPY . .
 
