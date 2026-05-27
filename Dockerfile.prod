@@ -76,17 +76,15 @@ COPY . .
 COPY --from=composer-builder /app/vendor ./vendor
 
 # Set permissions
-RUN mkdir -p storage/framework/{sessions,views,cache} bootstrap/cache \
+RUN mkdir -p storage/framework/{sessions,views,cache} bootstrap/cache resources/views \
     && chown -R www-data:www-data /app \
     && chmod -R 775 /app/storage /app/bootstrap/cache
 
 # Generate cache
-# Note: We don't use USER www-data here because we need root to run these commands
-# and write to the mounted volumes if necessary, but the files are already chowned.
 RUN php artisan package:discover --ansi \
     && php artisan config:cache \
     && php artisan route:cache \
-    && php artisan view:cache
+    && (php artisan view:cache || echo "Skipping view cache: No views found")
 
 USER www-data
 
