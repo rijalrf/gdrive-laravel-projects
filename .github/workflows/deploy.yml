@@ -1,0 +1,73 @@
+name: Build and Deploy to Docker Hub
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions UI
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Docker Buildx (enables caching and advanced build features)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Step 3: Login to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Step 4: Build and Push Docker image
+      # The image will be tagged with 'latest' and the git commit SHA.
+      # It also uses GitHub Actions caching to speed up subsequent builds.
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/gdrive-laravel:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/gdrive-laravel:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Optional Auto-Deploy Job
+  # To enable this, uncomment the section below and add SSH secrets to GitHub
+  #
+  # deploy:
+  #   name: Deploy to Server
+  #   needs: build-and-push
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: SSH and Deploy
+  #       uses: appleboy/ssh-action@master
+  #       with:
+  #         host: ${{ secrets.SSH_HOST }}
+  #         username: ${{ secrets.SSH_USERNAME }}
+  #         key: ${{ secrets.SSH_KEY }}
+  #         port: ${{ secrets.SSH_PORT || '22' }}
+  #         script: |
+  #           # Navigate to your project directory on the server
+  #           cd /path/to/your/app
+  #           
+  #           # Pull the latest Docker images
+  #           docker compose pull
+  #           
+  #           # Re-create and start the containers
+  #           docker compose up -d
+  #           
+  #           # Run migrations and optimize Laravel inside the container
+  #           docker compose exec -T gdrive-service php artisan migrate --force
+  #           docker compose exec -T gdrive-service php artisan optimize:clear
+  #           docker compose exec -T gdrive-service php artisan optimize

@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  gdrive-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gdrive-service
+    ports:
+      - "8095:8000"
+    volumes:
+      - .:/app
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_KEY=base64:v1Z8z0rR76+JgM3vD/Z47g4n3f1oKjN6e5m4d3c2a1o=
+      - QUEUE_CONNECTION=database
+    networks:
+      - mkas-net
+    depends_on:
+      - gdrive-db-init
+
+  gdrive-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gdrive-worker
+    volumes:
+      - .:/app
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - QUEUE_CONNECTION=database
+    command: php artisan queue:work --tries=3 --delay=3
+    networks:
+      - mkas-net
+    depends_on:
+      - gdrive-service
+
+  # Helper service to ensure migrations and jobs table exist
+  gdrive-db-init:
+    image: alpine
+    volumes:
+      - .:/app
+    command: >
+      sh -c "touch /app/database/database.sqlite && chmod 777 /app/database/database.sqlite"
+
+networks:
+  mkas-net:
+    name: mkas-laravel_default
+    external: true

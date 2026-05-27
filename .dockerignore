@@ -1,0 +1,9 @@
+.git
+/vendor
+/storage
+.env
+.env.backup
+.phpunit.result.cache
+node_modules
+npm-debug.log
+/bootstrap/cache/*.php
