@@ -13,6 +13,10 @@
 /.vscode
 /.zed
 /auth.json
+/storage/app/private/gdrive_temp/*
+/storage/app/public/*
+/database/*.sqlite
+/database/*.sqlite-journal
 /node_modules
 /public/build
 /public/fonts-manifest.dev.json

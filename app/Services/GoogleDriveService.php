@@ -204,6 +204,7 @@ class GoogleDriveService
         $quality = $options['quality'] ?? config('gdrive.compress.quality', 75);
 
         if ($async) {
+            Log::info("Queuing async upload for: {$targetPath}");
             // For async, we copy the file to a temporary storage path so the queue worker can access it.
             $tempDir = 'gdrive_temp';
             if (!Storage::exists($tempDir)) {
@@ -224,6 +225,7 @@ class GoogleDriveService
         }
 
         // Sync execution
+        Log::info("Starting sync upload for: {$targetPath}");
         return $this->uploadSync($localFilePath, $targetPath, $compress, $quality);
     }
 
@@ -239,9 +241,11 @@ class GoogleDriveService
         if ($compress && $this->isImage($localFilePath)) {
             $tempFile = tempnam(sys_get_temp_dir(), 'gdrive_img_');
             if ($this->compressImage($localFilePath, $tempFile, $quality)) {
+                Log::info("Image compressed successfully: {$targetPath}");
                 $uploadFilePath = $tempFile;
             } else {
                 // If compression fails, upload the original
+                Log::warning("Image compression failed, uploading original: {$targetPath}");
                 if ($tempFile && file_exists($tempFile)) {
                     unlink($tempFile);
                 }
@@ -250,6 +254,7 @@ class GoogleDriveService
         }
 
         try {
+            Log::info("Resolving folder path for: {$targetPath}");
             $parentId = $this->resolveFolderIdForPath($targetPath);
             $filename = basename($targetPath);
 
@@ -269,6 +274,7 @@ class GoogleDriveService
             $existingFileId = $this->findFileInFolder($filename, $parentId);
 
             if ($existingFileId) {
+                Log::info("Updating existing file in Google Drive. ID: {$existingFileId}");
                 // Update file
                 $file = $this->service->files->update($existingFileId, $fileMetadata, [
                     'data' => $content,
@@ -277,6 +283,7 @@ class GoogleDriveService
                     'fields' => 'id, name, webViewLink, webContentLink'
                 ]);
             } else {
+                Log::info("Creating new file in Google Drive: {$filename}");
                 // Create file
                 $file = $this->service->files->create($fileMetadata, [
                     'data' => $content,
@@ -291,6 +298,8 @@ class GoogleDriveService
                 unlink($tempFile);
             }
 
+            Log::info("Google Drive upload successful. ID: " . $file->getId());
+
             return [
                 'status' => 'success',
                 'id' => $file->getId(),
@@ -303,7 +312,7 @@ class GoogleDriveService
             if ($tempFile && file_exists($tempFile)) {
                 unlink($tempFile);
             }
-            Log::error("Google Drive Sync Upload failed: " . $e->getMessage());
+            Log::error("Google Drive Sync Upload failed for {$targetPath}: " . $e->getMessage());
             throw $e;
         }
     }

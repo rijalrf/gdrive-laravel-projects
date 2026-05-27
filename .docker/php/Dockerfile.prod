@@ -46,15 +46,15 @@ RUN apk add --no-cache \
     oniguruma-dev \
     icu-dev \
     bash \
-    mysql-client \
-    mariadb-connector-c
+    postgresql-dev \
+    postgresql-client
 
 # Configure and install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install -j$(nproc) \
         gd \
         pdo \
-        pdo_mysql \
+        pdo_pgsql \
         mbstring \
         zip \
         exif \

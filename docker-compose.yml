@@ -1,10 +1,8 @@
-version: '3.8'
-
 services:
   gdrive-service:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: .docker/php/Dockerfile
     container_name: gdrive-service
     ports:
       - "8095:8000"
@@ -15,15 +13,18 @@ services:
       - APP_DEBUG=true
       - APP_KEY=base64:v1Z8z0rR76+JgM3vD/Z47g4n3f1oKjN6e5m4d3c2a1o=
       - QUEUE_CONNECTION=database
+      - DB_CONNECTION=pgsql
+      - DB_HOST=host.docker.internal
+      - DB_PORT=5432
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
-      - mkas-net
-    depends_on:
-      - gdrive-db-init
+      - shared-network
 
   gdrive-worker:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: .docker/php/Dockerfile
     container_name: gdrive-worker
     volumes:
       - .:/app
@@ -31,21 +32,36 @@ services:
       - APP_ENV=local
       - APP_DEBUG=true
       - QUEUE_CONNECTION=database
+      - DB_CONNECTION=pgsql
+      - DB_HOST=host.docker.internal
+      - DB_PORT=5432
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: php artisan queue:work --tries=3 --delay=3
     networks:
-      - mkas-net
-    depends_on:
-      - gdrive-service
+      - shared-network
 
-  # Helper service to ensure migrations and jobs table exist
-  gdrive-db-init:
-    image: alpine
+  gdrive-scheduler:
+    build:
+      context: .
+      dockerfile: .docker/php/Dockerfile
+    container_name: gdrive-scheduler
     volumes:
       - .:/app
-    command: >
-      sh -c "touch /app/database/database.sqlite && chmod 777 /app/database/database.sqlite"
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - QUEUE_CONNECTION=database
+      - DB_CONNECTION=pgsql
+      - DB_HOST=host.docker.internal
+      - DB_PORT=5432
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: php artisan schedule:work
+    networks:
+      - shared-network
 
 networks:
-  mkas-net:
-    name: mkas-laravel_default
+  shared-network:
+    name: laravel-shared-network
     external: true

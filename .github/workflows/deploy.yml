@@ -32,7 +32,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.prod
+          file: .docker/php/Dockerfile.prod
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/gdrive-service:latest

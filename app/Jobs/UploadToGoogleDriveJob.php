@@ -45,10 +45,10 @@ class UploadToGoogleDriveJob implements ShouldQueue
      */
     public function handle(GoogleDriveService $driveService)
     {
-        Log::info("Async Upload Job started for target path: " . $this->targetPath);
+        Log::info("Async Upload Job execution started for: " . $this->targetPath);
 
         if (!Storage::exists($this->tempFilename)) {
-            Log::error("Temp file does not exist: " . $this->tempFilename);
+            Log::error("Temp file for async upload does not exist: " . $this->tempFilename);
             return;
         }
 
@@ -56,14 +56,16 @@ class UploadToGoogleDriveJob implements ShouldQueue
 
         try {
             $result = $driveService->uploadSync($localPath, $this->targetPath, $this->compress, $this->quality);
-            Log::info("Async Upload Job success. Google Drive File ID: " . $result['id']);
+            Log::info("Async Upload Job success for: {$this->targetPath}. Google Drive File ID: " . $result['id']);
         } catch (Exception $e) {
-            Log::error("Async Upload Job failed: " . $e->getMessage());
+            Log::error("Async Upload Job failed for {$this->targetPath}: " . $e->getMessage());
             throw $e;
         } finally {
             // Delete the temporary file from Laravel local storage
-            Storage::delete($this->tempFilename);
-            Log::info("Cleaned up temp file: " . $this->tempFilename);
+            if (Storage::exists($this->tempFilename)) {
+                Storage::delete($this->tempFilename);
+                Log::info("Cleaned up temp file after job: " . $this->tempFilename);
+            }
         }
     }
 }
