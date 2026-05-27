@@ -60,17 +60,15 @@ jobs:
             # Login ke Docker Hub (jika repo private)
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
+            # Matikan container dan HAPUS VOLUME 'gdrive-app' agar dibuat ulang dari image terbaru
+            # Ini memastikan file lama dan permission yang salah benar-benar bersih
+            docker compose -f docker-compose.prod.yml down -v
+
             # Pull image terbaru
             docker compose -f docker-compose.prod.yml pull
 
-            # Restart container dengan file konfigurasi produksi
+            # Jalankan container (volume baru otomatis terisi file dari image)
             docker compose -f docker-compose.prod.yml up -d
-
-            # Fix Permissions & Missing Directories (Jalankan sebagai root di host/container)
-            # Ini diperlukan karena volume 'gdrive-app' bersifat persistent dan mungkin menyimpan state lama
-            docker exec -t gdrive-service mkdir -p /app/storage/logs /app/storage/framework/{sessions,views,cache} /app/resources/views
-            docker exec -t gdrive-service chown -R www-data:www-data /app/storage /app/bootstrap/cache /app/resources/views
-            docker exec -t gdrive-service chmod -R 775 /app/storage /app/bootstrap/cache
 
             # Maintenance task di dalam container (Gunakan user www-data)
             docker exec --user www-data -t gdrive-service php artisan migrate --force

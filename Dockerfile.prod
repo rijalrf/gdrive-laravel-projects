@@ -76,14 +76,15 @@ COPY . .
 COPY --from=composer-builder /app/vendor ./vendor
 
 # Set permissions and ensure directory structure
+# We do this as root before switching to USER www-data
 RUN mkdir -p storage/framework/{sessions,views,cache} \
     storage/logs \
     bootstrap/cache \
     resources/views \
     && chown -R www-data:www-data /app \
-    && chmod -R 775 storage bootstrap/cache
+    && chmod -R 775 storage bootstrap/cache resources/views
 
-# Generate cache as www-data to avoid permission issues
+# Generate cache as www-data
 USER www-data
 
 RUN php artisan package:discover --ansi \
