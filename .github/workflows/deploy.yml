@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - staging
   workflow_dispatch:
 
 jobs:
@@ -62,10 +61,6 @@ jobs:
 
             # Login ke Docker Hub (jika repo private)
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-
-            # Pastikan network eksternal sudah ada
-            docker network inspect mkas-laravel-project_mkas-network >/dev/null 2>&1 || \
-            docker network create mkas-laravel-project_mkas-network
 
             # Pull image terbaru
             docker compose -f docker-compose.prod.yml pull
