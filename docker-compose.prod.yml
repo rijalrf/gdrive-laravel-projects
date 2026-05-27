@@ -54,6 +54,26 @@ services:
     depends_on:
       - gdrive-service
 
+  # Scheduler for Backups
+  gdrive-scheduler:
+    image: ${DOCKERHUB_USERNAME}/gdrive-service:latest
+    container_name: gdrive-scheduler
+    restart: always
+    environment:
+      - DB_CONNECTION=pgsql
+      - DB_HOST=host.docker.internal
+      - DB_PORT=5432
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - gdrive-app:/app
+      - .env:/app/.env:ro
+    command: php artisan schedule:work
+    networks:
+      - shared-network
+    depends_on:
+      - gdrive-service
+
 networks:
   shared-network:
     name: laravel-shared-network
