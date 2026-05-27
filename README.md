@@ -1,6 +1,6 @@
 # Laravel Google Drive Backup & Upload Service
 
-Proyek ini adalah layanan mikro (microservice) berbasis **Laravel 13** dan **PHP 8.4** yang dirancang khusus untuk menangani proses backup database MySQL secara berkala ke Google Drive, serta menyediakan API untuk mengunggah dan mengompresi berkas/gambar ke Google Drive.
+Proyek ini adalah layanan mikro (microservice) berbasis **Laravel 13** dan **PHP 8.4** yang dirancang khusus untuk menangani proses backup database PostgreSQL secara berkala ke Google Drive, serta menyediakan API untuk mengunggah dan mengompresi berkas/gambar ke Google Drive.
 
 Layanan ini berjalan sebagai **API-only service** (tanpa antarmuka HTML/UI) dan diintegrasikan dengan aplikasi utama lainnya melalui request HTTP JSON atau CLI Command.
 
@@ -13,13 +13,12 @@ Sistem didefinisikan menggunakan **Docker Compose** dan terbagi menjadi beberapa
 ```mermaid
 graph TD
     subgraph Host / Server
+        B[(Host PostgreSQL)]
         subgraph Docker Network: mkas-laravel_default
-            A[gdrive-service] <-->|Backup / Dump| B[(mkas-mysql)]
+            A[gdrive-service] <-->|Backup / Dump| B
             A <-->|Dispatch Jobs| C[gdrive-worker]
             C -->|Upload| D[Google Drive API]
             A -->|Upload| D
-            E[gdrive-db-init] -->|Inisialisasi SQLite| A
-            E -->|Inisialisasi SQLite| C
         end
     end
 ```
@@ -31,10 +30,8 @@ graph TD
 2. **`gdrive-worker`** (Queue Handler):
    - Menjalankan Laravel Queue Worker (`php artisan queue:work`) di latar belakang.
    - Menangani tugas asinkron seperti kompresi gambar dan proses upload berkas berukuran besar agar tidak menghalangi performa HTTP request utama.
-3. **`gdrive-db-init`** (Helper):
-   - Kontainer pembantu berbasis Alpine Linux untuk membuat file basis data lokal SQLite (`database.sqlite`) beserta hak akses yang tepat (`chmod 777`) saat startup kontainer pertama kali. SQLite digunakan oleh Laravel untuk menyimpan sesi, cache, dan antrean job (queue).
-4. **`mkas-mysql`** (Eksternal):
-   - Kontainer MySQL eksternal yang terhubung pada jaringan Docker `mkas-laravel_default` dan menjadi target utama proses backup database.
+3. **`PostgreSQL`** (Host):
+   - Instance PostgreSQL yang berjalan pada host WSL dan menjadi target utama proses backup database.
 
 ---
 
@@ -43,27 +40,27 @@ graph TD
 Layanan ini menggunakan pola desain modular dengan membagi tugas ke dalam beberapa kelas khusus:
 
 ### A. Layanan Inti Google Drive
-* **Berkas**: [GoogleDriveService.php](file:////wsl.localhost/Ubuntu/home/rijal/projects/laravel/gdrive-laravel/app/Services/GoogleDriveService.php)
+* **Berkas**: [GoogleDriveService.php](app/Services/GoogleDriveService.php)
 * **Fungsi Utama**:
   - Menginisialisasi Client Google API (`Google\Client`) berdasarkan mode otentikasi yang dipilih (OAuth 2.0 / Service Account).
-  - Menyelesaikan struktur folder Google Drive secara rekursif (`resolveFolderIdForPath`). Contoh: Jika diberikan path `MKAS LARAVEL STORAGE/TRANSACTIONS/bukti.jpg`, kelas ini akan mendeteksi atau membuat folder `MKAS LARAVEL STORAGE`, kemudian membuat subfolder `TRANSACTIONS`, lalu mengembalikan ID folder terakhir tersebut.
+  - Menyelesaikan struktur folder Google Drive secara rekursif (`resolveFolderIdForPath`).
   - Melakukan kompresi gambar secara natif (`compressImage`) menggunakan ekstensi PHP GD untuk tipe JPEG, PNG, dan WebP sebelum dikirim ke Google Drive.
-  - Mendukung upload sinkron (`uploadSync`) dan asinkron (`uploadImage`).
+  - Mendukung upload sinkron (`uploadSync`) and asinkron (`uploadImage`).
   - Mengambil/mengunduh data berkas untuk preview (`getImage`).
   - Menampilkan daftar berkas di folder tertentu (`listFiles`).
 
 ### B. Perintah CLI (Artisan Command)
-* **Berkas**: [BackupDatabaseCommand.php](file:////wsl.localhost/Ubuntu/home/rijal/projects/laravel/gdrive-laravel/app/Console/Commands/BackupDatabaseCommand.php)
+* **Berkas**: [BackupDatabaseCommand.php](app/Console/Commands/BackupDatabaseCommand.php)
 * **Perintah**: `php artisan db:backup {--async}`
 * **Fungsi Utama**:
-  - Melakukan backup database MySQL menggunakan tool `mysqldump` yang dipasang di Alpine.
+  - Melakukan backup database PostgreSQL menggunakan tool `pg_dump` yang dipasang di Alpine.
   - Hasil dump SQL langsung dikompresi di memori/aliran pipa (`gzip`) menjadi file `.sql.gz` untuk meminimalkan konsumsi ruang penyimpanan disk lokal.
-  - Menggunakan bendera `bash -o pipefail` untuk memastikan jika proses `mysqldump` gagal (misalnya karena masalah hak akses database), proses akan dihentikan seketika dan tidak mengunggah file kosong ke Google Drive.
+  - Menggunakan bendera `bash -o pipefail` untuk memastikan jika proses `pg_dump` gagal (misalnya karena masalah hak akses database), proses akan dihentikan seketika dan tidak mengunggah file kosong ke Google Drive.
   - Berkas lokal sementara akan langsung dihapus setelah proses upload berhasil diselesaikan.
   - Mendukung opsi `--async` untuk mendelegasikan pengunggahan file dump ke Queue Worker.
 
 ### C. Antrean Job (Queue Job)
-* **Berkas**: [UploadToGoogleDriveJob.php](file:////wsl.localhost/Ubuntu/home/rijal/projects/laravel/gdrive-laravel/app/Jobs/UploadToGoogleDriveJob.php)
+* **Berkas**: [UploadToGoogleDriveJob.php](app/Jobs/UploadToGoogleDriveJob.php)
 * **Fungsi Utama**:
   - Dijalankan oleh queue worker (`gdrive-worker`).
   - Membaca berkas temporary yang disimpan secara lokal di dalam folder `storage/app/gdrive_temp`.
@@ -71,18 +68,18 @@ Layanan ini menggunakan pola desain modular dengan membagi tugas ke dalam bebera
   - Menghapus berkas sementara dari local storage setelah proses selesai.
 
 ### D. HTTP Controller
-* **Berkas**: [GoogleDriveController.php](file:////wsl.localhost/Ubuntu/home/rijal/projects/laravel/gdrive-laravel/app/Http/Controllers/GoogleDriveController.php)
+* **Berkas**: [GoogleDriveController.php](app/Http/Controllers/GoogleDriveController.php)
 * **Fungsi Utama**:
   - `index()`: Mengembalikan status kesehatan (Health Check) layanan serta konektivitas Google Drive dalam format JSON.
   - `upload()`: Memvalidasi berkas masukan (maksimal 10MB) dan mengunggahnya ke Google Drive dengan parameter asinkron/kompresi. Mengembalikan respon JSON.
-  - `preview()`: Bertindak sebagai proxy/streamer berkas privat Google Drive agar dapat langsung dirender di browser klien (`inline disposition`) dengan pengaturan cache header demi efisiensi.
+  - `preview()`: Bertindak sebagai proxy/streamer berkas privat Google Drive agar dapat langsung dirender di browser klien.
   - `backup()`: Menyediakan endpoint API untuk memicu perintah `db:backup` melalui request HTTP POST.
 
 ---
 
 ## 3. Jalur API & Web (Routing)
 
-Semua rute didefinisikan secara efisien di dalam [web.php](file:////wsl.localhost/Ubuntu/home/rijal/projects/laravel/gdrive-laravel/routes/web.php) dan mengembalikan respons **JSON/Binary Stream** (tanpa UI HTML):
+Semua rute didefinisikan secara efisien di dalam [web.php](routes/web.php) dan mengembalikan respons **JSON/Binary Stream** (tanpa UI HTML):
 
 | Method | Endpoint | Fungsi | Parameter Request |
 | :--- | :--- | :--- | :--- |
@@ -90,25 +87,6 @@ Semua rute didefinisikan secara efisien di dalam [web.php](file:////wsl.localhos
 | **POST** | `/api/upload` | Mengunggah berkas/gambar dari container lain. | `file` (binary, required), `target_path` (opsional), `async` (boolean), `compress` (boolean), `quality` (int) |
 | **GET** | `/api/preview` | Preview/stream berkas secara langsung di browser. | `path` (string, required) |
 | **POST** | `/api/backup` | Trigger database backup secara remote lewat API. | `async` (boolean, opsional) |
-
-### Contoh Pemanggilan API dari Container Lain:
-
-#### 1. Trigger Backup Database:
-```bash
-curl -X POST http://gdrive-service:8000/api/backup \
-     -H "Accept: application/json" \
-     -d "async=true"
-```
-
-#### 2. Upload Berkas dengan Kompresi Gambar:
-```bash
-curl -X POST http://gdrive-service:8000/api/upload \
-     -H "Accept: application/json" \
-     -F "file=@/path/to/local/file.jpg" \
-     -F "target_path=MKAS LARAVEL STORAGE/TRANSACTIONS/bukti.jpg" \
-     -F "compress=true" \
-     -F "quality=80"
-```
 
 ---
 
@@ -118,11 +96,10 @@ Layanan ini mendukung **dua mode otentikasi utama** yang diatur melalui variabel
 
 1. **OAuth 2.0 (Refresh Token) - *Sangat Direkomendasikan***:
    - Menggunakan Client ID, Client Secret, dan Refresh Token yang didapatkan dari Google Cloud Console.
-   - Mode ini otomatis memperbarui Access Token yang kedaluwarsa secara berkala di latar belakang, tanpa memerlukan interaksi manual pengguna.
+   - Mode ini otomatis memperbarui Access Token yang kedaluwarsa secara berkala di latar belakang.
    - Diaktifkan dengan mengatur `GOOGLE_DRIVE_CREDENTIALS_MODE=refresh_token`.
 2. **Service Account JSON**:
-   - Menggunakan file kunci `.json` (atau string JSON langsung di variabel lingkungan) milik akun layanan Google Cloud Platform.
-   - File JSON diletakkan di dalam folder `storage/app/` dan ditautkan melalui path.
+   - Menggunakan file kunci `.json` milik akun layanan Google Cloud Platform.
    - Diaktifkan dengan mengatur `GOOGLE_DRIVE_CREDENTIALS_MODE=file`.
 
 ---
@@ -132,13 +109,13 @@ Layanan ini mendukung **dua mode otentikasi utama** yang diatur melalui variabel
 Konfigurasi di bawah ini digunakan untuk mengatur perilaku proyek:
 
 ```env
-# Koneksi Database Target Backup
-DB_CONNECTION=mysql
-DB_HOST=mkas-mysql
-DB_PORT=3306
-DB_DATABASE=mkas_db
-DB_USERNAME=root
-DB_PASSWORD=root
+# Koneksi Database Target Backup (PostgreSQL Host WSL)
+DB_CONNECTION=pgsql
+DB_HOST=host.docker.internal
+DB_PORT=5432
+DB_DATABASE=gdrive_laravel
+DB_USERNAME=postgres
+DB_PASSWORD=password
 
 # Pengaturan Otentikasi Google Drive
 GOOGLE_DRIVE_CREDENTIALS_MODE=refresh_token
@@ -160,14 +137,10 @@ GDRIVE_COMPRESS_QUALITY=75               # Kualitas kompresi gambar (1-100)
 ## 6. Docker & Otomatisasi CI/CD (GitHub Actions)
 
 ### A. Dockerfile 2-Stage
-Untuk mengurangi ukuran image di server produksi, [Dockerfile](file:////wsl.localhost/Ubuntu/home/rijal/projects/laravel/gdrive-laravel/Dockerfile) dipisahkan menjadi 2 tahap (tanpa compiler Node.js karena tidak ada UI):
-1. **Stage 1 (Composer Builder)**: Mengunduh dependensi PHP untuk kebutuhan produksi saja (`composer install --no-dev --optimize-autoloader`).
-2. **Stage 2 (Runtime)**: Image akhir yang bersih berbasis Alpine Linux dengan PHP 8.4 CLI, menyalin file kode inti dan folder `vendor` dari Stage 1. Image akhir ini sangat ringan karena tidak mengandung file NodeJS/NPM, source CSS/JS, dan cache composer.
+Untuk mengurangi ukuran image di server produksi, [Dockerfile](Dockerfile) dipisahkan menjadi 2 tahap:
+1. **Stage 1 (Composer Builder)**: Mengunduh dependensi PHP untuk kebutuhan produksi saja.
+2. **Stage 2 (Runtime)**: Image akhir yang bersih berbasis Alpine Linux dengan PHP 8.4 CLI, menyalin file kode inti dan folder `vendor` dari Stage 1. Dilengkapi dengan `postgresql-client` untuk mendukung perintah `pg_dump`.
 
 ### B. CI/CD GitHub Actions
-Berkas [deploy.yml](file:////wsl.localhost/Ubuntu/home/rijal/projects/laravel/gdrive-laravel/.github/workflows/deploy.yml) mendefinisikan alur pipa otomatisasi:
-- Berjalan secara otomatis setiap kali ada perubahan kode yang di-*push* ke cabang `main` atau `master`.
-- Menggunakan fitur cache GitHub Actions (`type=gha`) agar pembangunan image Docker berikutnya berjalan sangat cepat.
-- Masuk ke Docker Hub dan mengunggah image dengan tag `latest` dan tag unik berdasarkan Git SHA commit.
-- Menyediakan opsi deployment otomatis (SSH) untuk langsung memerintahkan server produksi/VPS mengunduh image terbaru dan memperbarui kontainer aplikasi.
+Berkas [deploy.yml](.github/workflows/deploy.yml) mendefinisikan alur pipa otomatisasi untuk pembangunan image Docker dan deployment otomatis ke server.
 # gdrive-laravel-projects

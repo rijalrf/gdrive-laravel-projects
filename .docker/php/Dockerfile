@@ -22,13 +22,13 @@ RUN apk add --no-cache \
     unzip \
     oniguruma-dev \
     sqlite-dev \
-    mysql-client \
-    mariadb-connector-c \
+    postgresql-dev \
+    postgresql-client \
     bash
 
 # Configure and install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install -j$(nproc) gd pdo pdo_sqlite pdo_mysql mbstring zip exif pcntl
+    && docker-php-ext-install -j$(nproc) gd pdo pdo_sqlite pdo_pgsql mbstring zip exif pcntl
 
 # Copy application files (excluding those in .dockerignore)
 COPY . .

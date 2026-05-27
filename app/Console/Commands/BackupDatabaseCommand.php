@@ -21,7 +21,7 @@ class BackupDatabaseCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Backup the MySQL database and upload it to Google Drive';
+    protected $description = 'Backup the PostgreSQL database and upload it to Google Drive';
 
     /**
      * Execute the console command.
@@ -34,16 +34,16 @@ class BackupDatabaseCommand extends Command
         $this->info('Starting database backup...');
 
         $connection = config('database.default');
-        if ($connection !== 'mysql') {
-            $this->error('Database connection is not configured to mysql. Current: ' . $connection);
+        if ($connection !== 'pgsql') {
+            $this->error('Database connection is not configured to pgsql. Current: ' . $connection);
             return 1;
         }
 
-        $host = config('database.connections.mysql.host');
-        $port = config('database.connections.mysql.port');
-        $database = config('database.connections.mysql.database');
-        $username = config('database.connections.mysql.username');
-        $password = config('database.connections.mysql.password');
+        $host = config('database.connections.pgsql.host');
+        $port = config('database.connections.pgsql.port');
+        $database = config('database.connections.pgsql.database');
+        $username = config('database.connections.pgsql.username');
+        $password = config('database.connections.pgsql.password');
 
         if (!$database) {
             $this->error('Database name is not configured.');
@@ -59,15 +59,15 @@ class BackupDatabaseCommand extends Command
         }
 
         // Use piping to gzip to compress the backup directly.
-        // We run it inside bash with pipefail enabled so that failures in mysqldump are correctly propagated.
+        // For PostgreSQL, we use PGPASSWORD environment variable and pg_dump.
         $dumpCmd = sprintf(
-            'MYSQL_PWD=%s mysqldump --no-tablespaces -h %s -P %s -u %s %s | gzip > %s',
-            $password, // Will be escaped as a whole inside the bash command
-            $host,
-            $port,
-            $username,
-            $database,
-            $tempPath
+            'PGPASSWORD=%s pg_dump -h %s -p %s -U %s %s | gzip > %s',
+            escapeshellarg($password),
+            escapeshellarg($host),
+            escapeshellarg($port),
+            escapeshellarg($username),
+            escapeshellarg($database),
+            escapeshellarg($tempPath)
         );
 
         $cmd = sprintf('bash -o pipefail -c %s', escapeshellarg($dumpCmd));
@@ -80,7 +80,7 @@ class BackupDatabaseCommand extends Command
 
         if ($resultCode !== 0) {
             $this->error('Failed to dump database. Exec command exited with code: ' . $resultCode);
-            Log::error('Database backup failed: mysqldump exited with code ' . $resultCode);
+            Log::error('Database backup failed: pg_dump exited with code ' . $resultCode);
             if (file_exists($tempPath)) {
                 unlink($tempPath);
             }
