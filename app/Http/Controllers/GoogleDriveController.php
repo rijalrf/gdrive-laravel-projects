@@ -104,18 +104,30 @@ class GoogleDriveController extends Controller
             return response()->json(['error' => 'Path parameter is required'], 400);
         }
 
-        try {
-            $fileData = $this->driveService->getImage($path);
-            
-            return response($fileData['content'], 200, [
-                'Content-Type' => $fileData['mimeType'],
-                'Content-Length' => $fileData['size'],
-                'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
-                'Cache-Control' => 'private, max-age=86400',
-            ]);
-        } catch (Exception $e) {
-            Log::error("Controller Preview error: " . $e->getMessage());
-            return response()->json(['error' => 'Could not retrieve file: ' . $e->getMessage()], 404);
+        $maxRetries = 3;
+        $retryDelay = 2; // seconds
+        $attempt = 0;
+
+        while ($attempt < $maxRetries) {
+            try {
+                $fileData = $this->driveService->getImage($path);
+                
+                return response($fileData['content'], 200, [
+                    'Content-Type' => $fileData['mimeType'],
+                    'Content-Length' => $fileData['size'],
+                    'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
+                    'Cache-Control' => 'private, max-age=86400',
+                ]);
+            } catch (Exception $e) {
+                $attempt++;
+                if ($attempt >= $maxRetries) {
+                    Log::error("Controller Preview error after {$attempt} attempts: " . $e->getMessage());
+                    return response()->json(['error' => 'Could not retrieve file: ' . $e->getMessage()], 404);
+                }
+                
+                Log::warning("Preview attempt {$attempt} failed, retrying in {$retryDelay}s... Path: {$path}");
+                sleep($retryDelay);
+            }
         }
      }
 
