@@ -76,21 +76,23 @@ COPY . .
 COPY --from=composer-builder /app/vendor ./vendor
 
 # Set permissions and ensure directory structure
-# We do this as root before switching to USER www-data
+# We ensure resources/views exists and has a placeholder file
 RUN mkdir -p storage/framework/{sessions,views,cache} \
     storage/logs \
     bootstrap/cache \
     resources/views \
+    && touch resources/views/.keep \
     && chown -R www-data:www-data /app \
     && chmod -R 775 storage bootstrap/cache resources/views
 
 # Generate cache as www-data
 USER www-data
 
+# We remove view:cache from build stage because it's failing due to missing view paths in some Laravel versions
+# and it's better to handle it during deployment if needed, or ensuring paths exist.
 RUN php artisan package:discover --ansi \
     && php artisan config:cache \
-    && php artisan route:cache \
-    && (php artisan view:cache || echo "Skipping view cache: No views found")
+    && php artisan route:cache
 
 EXPOSE 9000
 
