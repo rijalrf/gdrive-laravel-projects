@@ -75,18 +75,21 @@ COPY . .
 # Copy Composer dependencies from builder
 COPY --from=composer-builder /app/vendor ./vendor
 
-# Set permissions
-RUN mkdir -p storage/framework/{sessions,views,cache} bootstrap/cache resources/views \
+# Set permissions and ensure directory structure
+RUN mkdir -p storage/framework/{sessions,views,cache} \
+    storage/logs \
+    bootstrap/cache \
+    resources/views \
     && chown -R www-data:www-data /app \
-    && chmod -R 775 /app/storage /app/bootstrap/cache
+    && chmod -R 775 storage bootstrap/cache
 
-# Generate cache
+# Generate cache as www-data to avoid permission issues
+USER www-data
+
 RUN php artisan package:discover --ansi \
     && php artisan config:cache \
     && php artisan route:cache \
     && (php artisan view:cache || echo "Skipping view cache: No views found")
-
-USER www-data
 
 EXPOSE 9000
 
