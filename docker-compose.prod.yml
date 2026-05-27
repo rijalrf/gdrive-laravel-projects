@@ -3,19 +3,16 @@ version: "3.8"
 services:
   # PHP-FPM Service (Application)
   gdrive-service:
-    image: ${{ secrets.DOCKERHUB_USERNAME }}/gdrive-service:latest
+    image: ${DOCKERHUB_USERNAME}/gdrive-service:latest
     container_name: gdrive-service
     restart: always
     expose:
       - "9000"
-    environment:
-      - APP_ENV=production
-      - APP_DEBUG=false
-      - QUEUE_CONNECTION=database
+    env_file: .env
+    volumes:
+      - gdrive-app:/app
     networks:
       - mkas-net
-    depends_on:
-      - gdrive-db-init
 
   # Nginx Service (Web Server)
   gdrive-nginx:
@@ -23,10 +20,11 @@ services:
     container_name: gdrive-nginx
     restart: always
     ports:
-      - "8095:80"
+      - "${NGINX_PORT:-8095}:80"
     volumes:
-      - .:/app:ro
-      - ./.docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - gdrive-app:/app:ro
+    # Mengambil config nginx dari dalam volume app yang sudah di-mount
+    command: /bin/sh -c "cp /app/.docker/nginx/default.conf /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
     networks:
       - mkas-net
     depends_on:
@@ -34,26 +32,15 @@ services:
 
   # Queue Worker
   gdrive-worker:
-    image: ${{ secrets.DOCKERHUB_USERNAME }}/gdrive-service:latest
+    image: ${DOCKERHUB_USERNAME}/gdrive-service:latest
     container_name: gdrive-worker
     restart: always
-    environment:
-      - APP_ENV=production
-      - APP_DEBUG=false
-      - QUEUE_CONNECTION=database
+    env_file: .env
     command: php artisan queue:work --tries=3 --delay=3
     networks:
       - mkas-net
     depends_on:
       - gdrive-service
-
-  # Helper service for SQLite (If using SQLite)
-  gdrive-db-init:
-    image: alpine
-    volumes:
-      - gdrive-data:/app/database
-    command: >
-      sh -c "touch /app/database/database.sqlite && chmod 777 /app/database/database.sqlite"
 
 networks:
   mkas-net:
@@ -61,4 +48,4 @@ networks:
     external: true
 
 volumes:
-  gdrive-data:
+  gdrive-app:
