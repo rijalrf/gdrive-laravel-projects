@@ -19,7 +19,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
-      - mkas-net
+      - shared-network
 
   gdrive-worker:
     build:
@@ -39,9 +39,9 @@ services:
       - "host.docker.internal:host-gateway"
     command: php artisan queue:work --tries=3 --delay=3
     networks:
-      - mkas-net
+      - shared-network
 
 networks:
-  mkas-net:
-    name: mkas-laravel_default
+  shared-network:
+    name: laravel-shared-network
     external: true
