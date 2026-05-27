@@ -6,7 +6,6 @@ services:
     restart: always
     expose:
       - "9000"
-    env_file: .env
     environment:
       - DB_CONNECTION=pgsql
       - DB_HOST=host.docker.internal
@@ -15,6 +14,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - gdrive-app:/app
+      - .env:/app/.env:ro
     networks:
       - shared-network
 
@@ -39,13 +39,15 @@ services:
     image: ${DOCKERHUB_USERNAME}/gdrive-service:latest
     container_name: gdrive-worker
     restart: always
-    env_file: .env
     environment:
       - DB_CONNECTION=pgsql
       - DB_HOST=host.docker.internal
       - DB_PORT=5432
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - gdrive-app:/app
+      - .env:/app/.env:ro
     command: php artisan queue:work --tries=3 --delay=3
     networks:
       - shared-network
