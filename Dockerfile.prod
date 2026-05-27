@@ -1,0 +1,86 @@
+# Stage 1: Install Composer dependencies
+FROM php:8.4-cli-alpine AS composer-builder
+
+WORKDIR /app
+
+# Install build dependencies for composer
+RUN apk add --no-cache git unzip zip
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Copy only composer files first for better caching
+COPY composer.json composer.lock ./
+
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+
+# ---------------------------------------------------------
+
+# Stage 2: Final Production Image
+FROM php:8.4-fpm-alpine
+
+WORKDIR /app
+
+# Set production environment
+ENV APP_ENV=production
+ENV APP_DEBUG=false
+
+# Install runtime system dependencies
+RUN apk add --no-cache \
+    curl \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    libwebp-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    oniguruma-dev \
+    icu-dev \
+    bash \
+    mysql-client \
+    mariadb-connector-c
+
+# Configure and install PHP extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install -j$(nproc) \
+        gd \
+        pdo \
+        pdo_mysql \
+        mbstring \
+        zip \
+        exif \
+        pcntl \
+        bcmath \
+        intl \
+        opcache
+
+# Use the default production configuration
+RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+
+# Copy custom opcache config
+COPY .docker/php/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
+
+# Copy application files
+COPY . .
+
+# Copy Composer dependencies from builder
+COPY --from=composer-builder /app/vendor ./vendor
+
+# Set permissions
+RUN mkdir -p storage/framework/{sessions,views,cache} bootstrap/cache \
+    && chown -R www-data:www-data /app \
+    && chmod -R 775 /app/storage /app/bootstrap/cache
+
+# Generate cache
+RUN php artisan package:discover --ansi \
+    && php artisan config:cache \
+    && php artisan route:cache \
+    && php artisan view:cache
+
+USER www-data
+
+EXPOSE 9000
+
+CMD ["php-fpm"]

@@ -3,7 +3,7 @@ name: Build and Deploy to Docker Hub
 on:
   push:
     branches:
-      - main
+    - main
       - master
   workflow_dispatch: # Allows manual trigger from the GitHub Actions UI
 
@@ -35,6 +35,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: Dockerfile.prod
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/gdrive-laravel:latest
@@ -42,32 +43,33 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Optional Auto-Deploy Job
-  # To enable this, uncomment the section below and add SSH secrets to GitHub
-  #
-  # deploy:
-  #   name: Deploy to Server
-  #   needs: build-and-push
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: SSH and Deploy
-  #       uses: appleboy/ssh-action@master
-  #       with:
-  #         host: ${{ secrets.SSH_HOST }}
-  #         username: ${{ secrets.SSH_USERNAME }}
-  #         key: ${{ secrets.SSH_KEY }}
-  #         port: ${{ secrets.SSH_PORT || '22' }}
-  #         script: |
-  #           # Navigate to your project directory on the server
-  #           cd /path/to/your/app
-  #           
-  #           # Pull the latest Docker images
-  #           docker compose pull
-  #           
-  #           # Re-create and start the containers
-  #           docker compose up -d
-  #           
-  #           # Run migrations and optimize Laravel inside the container
-  #           docker compose exec -T gdrive-service php artisan migrate --force
-  #           docker compose exec -T gdrive-service php artisan optimize:clear
-  #           docker compose exec -T gdrive-service php artisan optimize
+  # Auto-Deploy Job
+  deploy:
+    name: Deploy to Server
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          script: |
+            # Pindah ke direktori proyek di server
+            cd /path/to/your/app
+            
+            # Login ke Docker Hub (jika repo private)
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            
+            # Pull image terbaru
+            docker compose -f docker-compose.prod.yml pull
+            
+            # Restart container dengan file konfigurasi produksi
+            docker compose -f docker-compose.prod.yml up -d
+            
+            # Maintenance task di dalam container
+            docker exec -t gdrive-service php artisan migrate --force
+            docker exec -t gdrive-service php artisan optimize:clear
+            docker exec -t gdrive-service php artisan optimize
