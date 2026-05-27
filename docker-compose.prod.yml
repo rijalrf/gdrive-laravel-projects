@@ -16,7 +16,7 @@ services:
     volumes:
       - gdrive-app:/app
     networks:
-      - mkas-net
+      - shared-network
 
   # Nginx Service (Web Server)
   gdrive-nginx:
@@ -30,7 +30,7 @@ services:
     # Mengambil config nginx dari dalam volume app yang sudah di-mount
     command: /bin/sh -c "cp /app/.docker/nginx/default.conf /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
     networks:
-      - mkas-net
+      - shared-network
     depends_on:
       - gdrive-service
 
@@ -48,13 +48,13 @@ services:
       - "host.docker.internal:host-gateway"
     command: php artisan queue:work --tries=3 --delay=3
     networks:
-      - mkas-net
+      - shared-network
     depends_on:
       - gdrive-service
 
 networks:
-  mkas-net:
-    name: mkas-laravel-project_mkas-network
+  shared-network:
+    name: laravel-shared-network
     external: true
 
 volumes:
