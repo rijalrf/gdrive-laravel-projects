@@ -55,8 +55,8 @@ class GoogleDriveController extends Controller
             'target_path' => 'nullable|string',
         ]);
 
-
         $file = $request->file('file');
+        Log::info("Upload request received. File: " . $file->getClientOriginalName() . " Size: " . $file->getSize() . " bytes");
         
         // Use default sample path if not provided
         $targetPath = $request->get('target_path', 'MKAS LARAVEL STORAGE/TRANSACTIONS/' . $file->getClientOriginalName());
@@ -73,12 +73,16 @@ class GoogleDriveController extends Controller
         $compress = $request->has('compress') ? filter_var($request->get('compress'), FILTER_VALIDATE_BOOLEAN) : config('gdrive.compress.enabled');
         $quality = $request->get('quality', config('gdrive.compress.quality', 75));
 
+        Log::info("Processing upload. Target: {$targetPath}, Async: " . ($async ? 'true' : 'false'));
+
         try {
             $result = $this->driveService->uploadImage($file->getPathname(), $targetPath, [
                 'async' => $async,
                 'compress' => $compress,
                 'quality' => (int)$quality,
             ]);
+
+            Log::info("Upload service call successful. Result status: " . ($result['status'] ?? 'unknown'));
 
             return response()->json([
                 'success' => true,
