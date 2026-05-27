@@ -51,7 +51,7 @@ class GoogleDriveController extends Controller
     public function upload(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|max:10240', // Max 10MB
+            'file' => 'required|file|max:102400', // Max 10MB
             'target_path' => 'nullable|string',
         ]);
 
