@@ -1,11 +1,9 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # PHP-FPM Service (Application)
   gdrive-service:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
+    image: ${{ secrets.DOCKERHUB_USERNAME }}/gdrive-service:latest
     container_name: gdrive-service
     restart: always
     expose:
@@ -36,9 +34,7 @@ services:
 
   # Queue Worker
   gdrive-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
+    image: ${{ secrets.DOCKERHUB_USERNAME }}/gdrive-service:latest
     container_name: gdrive-worker
     restart: always
     environment:
