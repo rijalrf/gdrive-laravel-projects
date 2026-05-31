@@ -74,6 +74,5 @@ jobs:
             # Maintenance task di dalam container
             # Kita hilangkan view:cache karena aplikasi ini kemungkinan tidak menggunakan blade/view (API only)
             docker exec --user www-data -t gdrive-service php artisan migrate --force
-            docker exec --user www-data -t gdrive-service php artisan optimize:clear
             docker exec --user www-data -t gdrive-service php artisan config:cache
             docker exec --user www-data -t gdrive-service php artisan route:cache
